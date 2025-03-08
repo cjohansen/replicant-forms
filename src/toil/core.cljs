@@ -9,6 +9,7 @@
    (fn [x]
      (case x
        :event/target.value (.. event -target -value)
+       :clock/now (js/Date.)
        x))
    actions))
 
@@ -16,6 +17,7 @@
   (doseq [[action & args] (remove nil? actions)]
     (apply prn action args)
     (case action
+      :event/prevent-default (.preventDefault event)
       :db/transact (apply d/transact! conn args)
       (println "Unknown action" action "with arguments" args))))
 
