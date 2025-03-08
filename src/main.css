@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {}
+
+@layer components {
+    .link {
+        @apply underline text-blue-700 cursor-pointer;
+    }
+
+    .link:hover {
+        @apply no-underline;
+    }
+
+}
+
+@keyframes tilt-shaking {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(5deg); }
+    50% { transform: rotate(0deg); }
+    75% { transform: rotate(-5deg); }
+    100% { transform: rotate(0deg); }
+}
+
+.tilt {
+    display: inline-block;
+    animation: tilt-shaking 0.25s 4;
+}

@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "daisyui": "^4.12.23",
+    "shadow-cljs": "^2.28.21"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.3.2"
+  }
+}
