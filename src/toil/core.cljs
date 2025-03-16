@@ -3,6 +3,7 @@
             [datascript.core :as d]
             [replicant.dom :as r]
             [toil.forms :as forms]
+            [toil.task :as task]
             [toil.ui :as ui]))
 
 (defn get-input-value [^js element]
@@ -56,22 +57,25 @@
        x))
    actions))
 
+(def forms
+  (->> [task/edit-form]
+       (map (juxt :form/id identity))
+       (into {})))
+
 (declare execute-actions)
 
 (defn submit-form [conn ^js event form-id & args]
-  (let [data (gather-form-data (.-target event))
-        actions (case form-id
-                  :forms/edit-task
-                  (apply forms/submit-edit-task data args))]
-    (execute-actions conn event actions)))
+  (->> (apply forms/submit
+              (get forms form-id)
+              (gather-form-data (.-target event))
+              args)
+       (execute-actions conn event)))
 
-(defn validate-form [conn ^js event form-id & args]
-  (let [form ^js (.closest (.-target event) "form")
-        data (gather-form-input-data form)
-        actions (case form-id
-                  :forms/edit-task
-                  (apply forms/validate-edit-task-form form-id data args))]
-    (execute-actions conn event actions)))
+(defn validate-form [conn ^js event form-id]
+  (->> (forms/validate
+        (get forms form-id)
+        (gather-form-data (.closest (.-target event) "form")))
+       (execute-actions conn event)))
 
 (defn execute-actions [conn ^js event actions]
   (doseq [[action & args] (remove nil? actions)]
