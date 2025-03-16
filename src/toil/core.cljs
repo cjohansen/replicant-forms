@@ -3,6 +3,7 @@
             [datascript.core :as d]
             [replicant.dom :as r]
             [toil.forms :as forms]
+            [toil.schema :as schema]
             [toil.task :as task]
             [toil.ui :as ui]))
 
@@ -15,6 +16,9 @@
     (= "number" (aget (.-dataset element) "type"))
     (when (not-empty (.-value element))
       (parse-long (.-value element)))
+
+    (= "boolean" (aget (.-dataset element) "type"))
+    (= "true" (.-value element))
 
     (= "checkbox" (.-type element))
     (if (.hasAttribute element "value")
@@ -47,14 +51,15 @@
 (defn gather-form-data [^js form-el]
   (gather-form-input-data (.-elements form-el)))
 
-(defn interpolate [event actions]
+(defn interpolate [event actions & [interpolations]]
   (walk/postwalk
    (fn [x]
-     (case x
-       :event/target.value (.. event -target -value)
-       :event/form-data (some-> event .-target gather-form-data)
-       :clock/now (js/Date.)
-       x))
+     (or (get interpolations x)
+         (case x
+           :event/target.value (.. event -target -value)
+           :event/form-data (some-> event .-target gather-form-data)
+           :clock/now (js/Date.)
+           x)))
    actions))
 
 (def forms
@@ -65,17 +70,35 @@
 (declare execute-actions)
 
 (defn submit-form [conn ^js event form-id & args]
-  (->> (apply forms/submit
-              (get forms form-id)
-              (gather-form-data (.-target event))
-              args)
-       (execute-actions conn event)))
+  (let [form-data (gather-form-data (.-target event))
+        actions (apply forms/submit
+                       (get forms form-id)
+                       form-data
+                       args)]
+    (->> (interpolate event actions {:event/form-data form-data})
+         (execute-actions conn event))))
 
 (defn validate-form [conn ^js event form-id]
   (->> (forms/validate
         (get forms form-id)
         (gather-form-data (.closest (.-target event) "form")))
        (execute-actions conn event)))
+
+(defn transact-w-nils [conn txes]
+  (d/transact!
+   conn
+   (mapcat
+    (fn [tx]
+      (if (map? tx)
+        (let [nil-ks (map key (filter (comp nil? val) tx))
+              identity (or (:db/id tx)
+                           (when-let [attr (some tx schema/unique-attrs)]
+                             [attr (attr tx)]))]
+          (conj (for [k nil-ks]
+                  [:db/retract identity k])
+                (apply dissoc tx nil-ks)))
+        [tx]))
+    txes)))
 
 (defn execute-actions [conn ^js event actions]
   (doseq [[action & args] (remove nil? actions)]
@@ -85,6 +108,7 @@
       :form/validate (apply validate-form conn event args)
       :form/submit (apply submit-form conn event args)
       :db/transact (apply d/transact! conn args)
+      :db/transact-w-nils (apply transact-w-nils conn args)
       (println "Unknown action" action "with arguments" args))))
 
 (defn main [conn el]

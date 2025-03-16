@@ -34,8 +34,13 @@
     [[:db/transact
       [{:form/id (:form/id form)
         :form/validation-errors errors}]]]
-    (let [actions (vec (apply (:form/handler form) data args))
+    (let [actions (vec (or (:form/submit-actions form)
+                           (when-let [handler (:form/handler form)]
+                             (apply (handler form) data args))))
           idx (.indexOf (map first actions) :db/transact)
+          idx (if (<= 0 idx)
+                idx
+                (.indexOf (map first actions) :db/transact-w-nils))
           cleanup-tx [:db/retractEntity [:form/id (:form/id form)]]]
       (if (<= 0 idx)
         (update-in actions [idx 1] conj cleanup-tx)

@@ -3,16 +3,6 @@
             [phosphor.icons :as icons]
             [toil.forms :as forms]))
 
-(defn edit-task [data task-id]
-  (let [nil-ks (map key (filter (comp nil? val) data))]
-    [[:db/transact
-      (into
-       [(-> (apply dissoc data nil-ks)
-            (assoc :db/id task-id)
-            (assoc :task/editing? false))]
-       (for [k nil-ks]
-         [:db/retract task-id k]))]]))
-
 (def edit-form
   {:form/id :forms/edit-task
    :form/fields
@@ -24,7 +14,8 @@
        :validation/message "Duration can not exceed 60 minutes"
        :max 60}]}]
 
-   :form/handler edit-task})
+   :form/submit-actions
+   [[:db/transact-w-nils [:event/form-data]]]})
 
 (def priorities
   [{:value :task.priority/high
@@ -71,6 +62,9 @@
    {:on {:submit [[:event/prevent-default]
                   [:form/submit :forms/edit-task (:db/id task)]]}}
    (forms/text-input task :db/id {:type "hidden" :data-type "number"})
+   (forms/text-input task :task/editing? {:type "hidden"
+                                          :value "false"
+                                          :data-type "boolean"})
    (forms/input-field form "Task" task :task/name forms/text-input)
    (forms/input-field form "Duration" task :task/duration forms/text-input {:type "number"})
    (forms/input-field form "Priority" task :task/priority forms/select priorities)
