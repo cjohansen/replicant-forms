@@ -107,7 +107,7 @@
   (testing "Cleans up form even when it doesn't do a db/transact"
     (is (= (forms/submit
             {:form/id :forms/test-form
-             :form/handler (fn [data task-id] [])}
+             :form/handler (fn [_ _] [])}
             {:task/name "Do it!"}
             1)
            [[:db/transact
