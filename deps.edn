@@ -1,4 +1,4 @@
-{:paths ["src" "resources"]
+{:paths ["src" "resources" "test"]
  :deps {org.clojure/clojure {:mvn/version "1.12.0"}
         datascript/datascript {:mvn/version "1.7.3"}
         no.cjohansen/phosphor-clj {:mvn/version "2025.03.14"}
