@@ -5,3 +5,4 @@
 /node_modules/
 /resources/public/tailwind.css
 /resources/public/js/
+/resources/test/tests.js

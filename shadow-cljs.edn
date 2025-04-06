@@ -4,4 +4,9 @@
  {:app
   {:target :browser
    :modules {:main {:init-fn toil.dev/main}}
-   :dev {:output-dir "resources/public/js"}}}}
+   :dev {:output-dir "resources/public/js"}}
+  :test
+  {:target    :node-test
+   :output-to "resources/test/tests.js"
+   :ns-regexp "-test$"
+   :autorun   true}}}
