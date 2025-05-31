@@ -1,6 +1,7 @@
 (ns toil.ui
   (:require [datascript.core :as d]
-            [phosphor.icons :as icons]))
+            [phosphor.icons :as icons]
+            [toil.forms :as forms]))
 
 (defn render-task-form [db]
   (let [text (:task/name (d/entity db [:db/ident ::task]))]
@@ -54,13 +55,46 @@
                      {:focusable "false"})])
     [:span {:class (when (:task/complete? task)
                      "line-through")}
-     (:task/name task)]]])
+     (:task/name task)]]
+   [:button.w-6
+    {:aria-label "Edit"
+     :on {:click [[:db/transact
+                   [[:db/add (:db/id task)
+                     :task/editing? true]]]]}}
+    (icons/render
+     (icons/icon :phosphor.regular/gear)
+     {:focusable "false"})]])
+
+(def priorities
+  [{:value :task.priority/high
+    :label "High"}
+   {:value :task.priority/medium
+    :label "Medium"}
+   {:value :task.priority/low
+    :label "Low"}])
+
+(defn render-edit-form [form task]
+  [:form.my-4.flex.flex-col.gap-4
+   {:on {:submit [[:event/prevent-default]
+                  [:form/submit :forms/edit-task (:db/id task)]]}}
+   (forms/text-input task :db/id {:type "hidden" :data-type "number"})
+   (forms/input-field form "Task" task :task/name forms/text-input)
+   (forms/input-field form "Duration" task :task/duration forms/text-input {:type "number"})
+   (forms/input-field form "Priority" task :task/priority forms/select priorities)
+   (forms/input-field form "Complete?" task :task/complete? forms/checkbox)
+   [:div.flex.flex-row.gap-4
+    [:button.btn.btn-primary {:type "submit"}
+     "Save"]]])
 
 (defn render-tasks [db]
   [:ol.mb-4.max-w-screen-sm
    (for [task (get-tasks db)]
      [:li.bg-base-200.my-2.px-4.py-3.rounded.w-full
-      (render-task task)])])
+      (if (:task/editing? task)
+        (render-edit-form
+         (d/entity db [:form/id [:forms/edit-task (:db/id task)]])
+         task)
+        (render-task task))])])
 
 (defn render-page [db]
   [:main.md:p-8.p-4.max-w-screen-m
