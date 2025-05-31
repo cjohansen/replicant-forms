@@ -1,6 +1,48 @@
 (ns toil.forms
   (:require [replicant.hiccup :as hiccup]))
 
+(defn validate-field [field validation data]
+  (case (:validation/kind validation)
+    :required
+    (when (empty? data)
+      {:validation-error/field field
+       :validation-error/message
+       (or (:validation/message validation)
+           "Please type in some text")})
+
+    :max-num
+    (when (< (:max validation) (or data 0))
+      {:validation-error/field field
+       :validation-error/message
+       (or (:validation/message validation)
+           (str "Should be max " (:max validation)))})))
+
+(defn validate-form-data [form data]
+  (->> (:form/fields form)
+       (mapcat
+        (fn [{:keys [k validations]}]
+          (let [field-data (get data k)]
+            (keep #(validate-field k % field-data) validations))))))
+
+(defn validate [form data]
+  [[:db/transact
+    [{:form/id (:form/id form)
+      :form/validation-errors (validate-form-data form data)}]]])
+
+(defn submit [form data & args]
+  (if-let [errors (seq (validate-form-data form data))]
+    [[:db/transact
+      [{:form/id (:form/id form)
+        :form/validation-errors errors}]]]
+    (let [actions (vec (or (:form/submit-actions form)
+                           (when-let [handler (:form/handler form)]
+                             (apply handler data args))))
+          idx (.indexOf (map first actions) :db/transact)
+          cleanup-tx [:db/retractEntity [:form/id (:form/id form)]]]
+      (if (<= 0 idx)
+        (update-in actions [idx 1] conj cleanup-tx)
+        (conj actions [:db/transact [cleanup-tx]])))))
+
 (defn keyword->s [k]
   (if-let [ns (namespace k)]
     (str ns "/" (name k))
@@ -55,32 +97,3 @@
           (when error
             [:div.validator-hint.text-error.ml-24.-m-2.mb-2
              (:validation-error/message error)]))))
-
-(defn validate-edit-task [data]
-  (->> [(when (empty? (:task/name data))
-          {:validation-error/field :task/name
-           :validation-error/message "Please type in some text"})
-        (when (< 60 (or (:task/duration data) 0))
-          {:validation-error/field :task/duration
-           :validation-error/message "Duration can not exceed 60 minutes"})]
-       (remove nil?)))
-
-(defn validate-edit-task-form [form-id data]
-  [[:db/transact
-    [{:form/id form-id
-      :form/validation-errors (validate-edit-task data)}]]])
-
-(defn submit-edit-task [form-type task-id data]
-  (if-let [errors (seq (validate-edit-task data))]
-    [[:db/transact
-      [{:form/id [form-type task-id]
-        :form/validation-errors errors}]]]
-    (let [nil-ks (map key (filter (comp nil? val) data))]
-      [[:db/transact
-        (into
-         [(-> (apply dissoc data nil-ks)
-              (assoc :db/id task-id)
-              (assoc :task/editing? false))
-          [:db/retractEntity [:form/id [form-type task-id]]]]
-         (for [k nil-ks]
-           [:db/retract task-id k]))]])))
